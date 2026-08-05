@@ -76,6 +76,7 @@
   }
 
   // ---------- 场景渲染 ----------
+  let lastPreviewClipId = null;
   function sceneHTML(mid) {
     const m = MATERIALS.find((x) => x.id === mid);
     const inner = {
@@ -229,19 +230,24 @@
       sceneEl.style.transform = '';
       sceneEl.style.filter = '';
       $('guides').hidden = true;
+      lastPreviewClipId = null;
       return;
     }
-    const under = clipAt(state.playhead);
-    const c = playing ? under : (selected() || under);
+    const c = clipAt(state.playhead);
 
     if (!c) {
       sceneEl.innerHTML = `<div class="scene-empty">🎬 把素材拖进时间线开始剪</div>`;
       sceneEl.style.transform = '';
       sceneEl.style.filter = '';
+      $('guides').hidden = true;
+      lastPreviewClipId = null;
       return;
     }
     const m = mat(c);
-    sceneEl.innerHTML = sceneHTML(m.id);
+    if (lastPreviewClipId !== c.id) {
+      sceneEl.innerHTML = sceneHTML(m.id);
+      lastPreviewClipId = c.id;
+    }
     const dx = (c.comp.dx || 0), dy = (c.comp.dy || 0), sc = (c.comp.scale || 1.4);
     sceneEl.style.transform = `translate(${dx}px, ${dy}px) scale(${sc})`;
     sceneEl.style.filter = FILTERS[c.filter] ? FILTERS[c.filter].css : '';
@@ -361,6 +367,7 @@
       state.clips.splice(atIndex, 0, clip);
     }
     state.selectedId = clip.id;
+    state.playhead = clip.start;
     renderAll();
   }
 
@@ -389,6 +396,7 @@
     const i = state.clips.indexOf(c);
     state.clips.splice(i, 1, A, B);
     state.selectedId = B.id;
+    state.playhead = B.start;
 
     if (fb === 'good') { state.stats.perfect++; popup('Perfect Cut!', 'perfect'); sndPerfect(); }
     else if (fb === 'bad') { state.stats.bad++; popup('剪坏啦！', 'bad'); sndBad(); shakeStage(); }
@@ -408,9 +416,11 @@
         return;
       }
       state.selectedId = c.id;
+      state.playhead = c.start;
       document.querySelectorAll('.clip').forEach((x) => x.classList.toggle('selected', x.dataset.id === c.id));
       renderInspector();
       renderPreview();
+      updatePlayhead();
       startDrag(e, el, c);
     });
   }

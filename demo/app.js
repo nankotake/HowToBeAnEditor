@@ -149,7 +149,7 @@
       card.style.setProperty('--c1', m.c1);
       card.style.setProperty('--c2', m.c2);
       card.innerHTML = `<span class="thumb">${m.emoji}</span>
-        <div><div class="m-name">${m.name}</div><div class="m-meta">${m.dur}s · ${m.good.length}好点 · ${m.bad.length}坏点</div></div>`;
+        <div><div class="m-name">${m.name}</div><div class="m-meta">${fmtShort(m.dur)} · 好${m.good.length} · 坏${m.bad.length}</div></div>`;
       if (m.anomaly.length) card.innerHTML += `<span class="anomaly-badge">?</span>`;
       card.addEventListener('click', () => { ensureAudio(); addClip(m); });
       card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', m.id); e.dataTransfer.effectAllowed = 'copy'; });
@@ -163,9 +163,9 @@
     ruler.style.width = Math.max(total, 8) * PPS + 'px';
     for (let i = 0; i <= Math.ceil(total); i++) {
       const tick = document.createElement('div');
-      tick.className = 'tick';
+      tick.className = 'tick' + (i % 5 === 0 ? ' major' : '');
       tick.style.left = i * PPS + 'px';
-      tick.innerHTML = `<span class="tick-label">${i}s</span>`;
+      if (i % 5 === 0) tick.innerHTML = `<span class="tick-label">${fmtShort(i)}</span>`;
       ruler.appendChild(tick);
     }
   }
@@ -306,8 +306,16 @@
     $('time-label').textContent = fmt(state.playhead) + ' / ' + fmt(totalDur());
   }
   function fmt(t) {
-    const s = Math.floor(t), m = Math.floor(s / 60);
-    return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    t = Math.max(0, t);
+    const h = Math.floor(t / 3600);
+    const m = Math.floor(t / 60) % 60;
+    const s = Math.floor(t) % 60;
+    const f = Math.floor((t - Math.floor(t)) * 25);
+    return [h, m, s, f].map((x) => String(x).padStart(2, '0')).join(':');
+  }
+  function fmtShort(t) {
+    const m = Math.floor(t / 60), s = Math.floor(t) % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   }
 
   function renderAll() {

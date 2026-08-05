@@ -9,19 +9,26 @@
 <body>
   <div id="app">
     <header id="topbar">
-      <div class="brand">✂️ 剪单人生 <span class="demo-tag">Demo</span></div>
+      <div class="brand">剪单人生<span class="demo-tag">DEMO</span></div>
+      <nav id="pages">
+        <button class="page-tab">素材库</button>
+        <button class="page-tab active">剪辑</button>
+        <button class="page-tab">调色</button>
+        <button class="page-tab">交付</button>
+      </nav>
       <div class="tools">
-        <button id="tool-select" class="tool-btn active" data-tool="select">🖱️ 选择</button>
-        <button id="tool-blade" class="tool-btn" data-tool="blade">🔪 刀片</button>
-        <button id="btn-cut" class="tool-btn">✂️ 分割</button>
-        <button id="btn-delete" class="tool-btn danger">🗑️ 删除</button>
+        <button id="tool-select" class="tool-btn active" data-tool="select">选择</button>
+        <button id="tool-blade" class="tool-btn" data-tool="blade">刀片</button>
+        <span class="tool-sep"></span>
+        <button id="btn-cut" class="tool-btn">分割</button>
+        <button id="btn-delete" class="tool-btn">删除</button>
       </div>
-      <button id="btn-deliver" class="deliver-btn">📤 交付</button>
+      <button id="btn-deliver" class="deliver-btn">交付</button>
     </header>
 
     <main id="main">
       <aside id="media-pool">
-        <h2>素材库</h2>
+        <h2>素材库 <span class="en">Media</span></h2>
         <p class="hint">点击加入时间线，或直接拖进去</p>
         <div id="media-list"></div>
       </aside>
@@ -41,30 +48,30 @@
         <div id="transport">
           <button id="btn-play">▶</button>
           <span id="time-label">00:00 / 00:00</span>
-          <span id="dur-hint"></span>
+          <span id="dur-hint">空格 播放/暂停 · ← → 微调</span>
         </div>
       </section>
 
       <aside id="inspector">
-        <h2>检查器</h2>
+        <h2>检查器 <span class="en">Inspector</span></h2>
         <div id="insp-empty" class="hint">选中时间线上的素材开始处理</div>
         <div id="insp-body" hidden>
           <div id="insp-name"></div>
           <div class="insp-section">
-            <h3>🎨 调色</h3>
+            <h3>调色 <span class="en">Color</span></h3>
             <div id="filter-btns"></div>
           </div>
           <div class="insp-section">
-            <h3>🖼️ 构图</h3>
+            <h3>构图 <span class="en">Transform</span></h3>
             <p class="mini-hint">拖动画面找好构图，靠近居中/三分线自动吸附</p>
             <div id="comp-tools">
-              <button id="btn-center">⏺ 居中</button>
+              <button id="btn-center">居中</button>
               <input id="scale-slider" type="range" min="100" max="240" step="5" value="140">
               <span id="scale-label">140%</span>
             </div>
           </div>
           <div class="insp-section">
-            <h3>📍 节奏点</h3>
+            <h3>节奏点 <span class="en">Markers</span></h3>
             <div id="marker-chips" class="mini-hint"></div>
           </div>
         </div>
@@ -72,6 +79,10 @@
     </main>
 
     <section id="timeline-panel">
+      <div id="tl-head">
+        <span>时间线 <span class="en">Timeline</span></span>
+        <span id="tl-zoom">点击标尺可吸附节奏点 · 拖动片段边缘裁剪</span>
+      </div>
       <div id="ruler-wrap">
         <div id="ruler"></div>
         <div id="playhead"><div class="ph-knob"></div></div>
@@ -85,9 +96,13 @@
 
     <footer id="statusbar">
       <span id="st-client"></span>
+      <span class="sep">│</span>
       <span id="st-duration"></span>
+      <span class="sep">│</span>
       <span id="st-budget"></span>
+      <span class="sep">│</span>
       <span id="st-anomaly"></span>
+      <span class="right">1920×1080 · 25fps</span>
     </footer>
   </div>
 
@@ -102,8 +117,8 @@
         <div id="client-line"></div>
         <div id="detail-line"></div>
         <div class="result-btns">
-          <button id="btn-retry">🔁 重剪</button>
-          <button id="btn-next">📮 接下一单</button>
+          <button id="btn-retry">重剪</button>
+          <button id="btn-next">接下一单</button>
         </div>
       </div>
     </div>

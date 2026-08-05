@@ -145,7 +145,7 @@
       card.draggable = true;
       card.style.setProperty('--c1', m.c1);
       card.style.setProperty('--c2', m.c2);
-      card.innerHTML = `<span class="thumb">${m.emoji}</span>
+      card.innerHTML = `<div class="media-thumb">${sceneHTML(m.id)}</div>
         <div><div class="m-name">${m.name}</div><div class="m-meta">${fmtShort(m.dur)} · 好${m.good.length} · 坏${m.bad.length}</div></div>`;
       if (m.anomaly.length) card.innerHTML += `<span class="anomaly-badge">?</span>`;
       card.addEventListener('click', () => { ensureAudio(); addClip(m); });
@@ -698,7 +698,36 @@
   }
 
   // ---------- 事件绑定 ----------
+  function bindResize() {
+    const startResize = (e, mode) => {
+      e.preventDefault();
+      ensureAudio();
+      const startX = e.clientX, startY = e.clientY;
+      const cs = getComputedStyle(document.documentElement);
+      const poolW = parseFloat(cs.getPropertyValue('--pool-w')) || 340;
+      const inspW = parseFloat(cs.getPropertyValue('--insp-w')) || 250;
+      const tlH = parseFloat(cs.getPropertyValue('--tl-h')) || 172;
+      const rs = document.documentElement.style;
+      const move = (ev) => {
+        const dx = ev.clientX - startX, dy = ev.clientY - startY;
+        if (mode === 'pool') rs.setProperty('--pool-w', clamp(poolW + dx, 240, 500) + 'px');
+        if (mode === 'insp') rs.setProperty('--insp-w', clamp(inspW - dx, 220, 440) + 'px');
+        if (mode === 'tl') rs.setProperty('--tl-h', clamp(tlH - dy, 110, 420) + 'px');
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    };
+    $('resize-pool').addEventListener('pointerdown', (e) => startResize(e, 'pool'));
+    $('resize-insp').addEventListener('pointerdown', (e) => startResize(e, 'insp'));
+    $('resize-tl').addEventListener('pointerdown', (e) => startResize(e, 'tl'));
+  }
+
   function bindEvents() {
+    bindResize();
     $('btn-play').addEventListener('click', () => { ensureAudio(); state.playing ? pause() : play(); });
     $('btn-start').addEventListener('click', () => { ensureAudio(); pause(); state.playhead = 0; updatePlayhead(); renderPreview(); });
     $('btn-end').addEventListener('click', () => { ensureAudio(); pause(); state.playhead = totalDur(); updatePlayhead(); renderPreview(); });

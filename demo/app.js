@@ -1,0 +1,750 @@
+// ===== 剪单人生 Demo · 主逻辑 =====
+(function () {
+  'use strict';
+
+  const PPS = 64;            // 时间线像素/秒
+  const SNAP_T = 0.18;       // 节奏点吸附阈值（秒）
+  const MIN_DUR = 0.5;
+
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const uid = () => Math.random().toString(36).slice(2, 9);
+
+  const state = {
+    clips: [],          // { id, mid, in, out, filter, comp:{dx,dy,scale,snapped} }
+    playhead: 0,
+    playing: false,
+    selectedId: null,
+    tool: 'select',
+    order: null,
+    stats: null,
+    anomalySeen: 0,
+    budget: 0,
+    stageW: 0,
+    stageH: 0,
+  };
+
+  // ---------- 音频反馈 ----------
+  let actx = null;
+  function ensureAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (actx && actx.state === 'suspended') actx.resume();
+  }
+  function beep(freq, dur, type = 'sine', vol = 0.16, delay = 0) {
+    if (!actx) return;
+    const t0 = actx.currentTime + delay;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    osc.connect(g); g.connect(actx.destination);
+    osc.start(t0); osc.stop(t0 + dur);
+  }
+  const sndGood = () => beep(880, 0.09);
+  const sndBad = () => beep(150, 0.18, 'square', 0.14);
+  const sndPerfect = () => { beep(660, 0.09); beep(880, 0.09, 'sine', 0.16, 0.08); beep(1320, 0.16, 'sine', 0.16, 0.16); };
+  const sndAnomaly = () => { beep(130, 0.35, 'triangle', 0.14); beep(97, 0.45, 'triangle', 0.12, 0.1); };
+
+  // ---------- 弹出反馈 ----------
+  function popup(text, cls) {
+    const layer = $('toast-layer');
+    const el = document.createElement('div');
+    el.className = 'popup ' + cls;
+    el.textContent = text;
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), 950);
+  }
+  function shakeStage() {
+    const s = $('preview-stage');
+    s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake');
+    setTimeout(() => s.classList.remove('shake'), 450);
+  }
+  function flickerStage() {
+    const s = $('preview-stage');
+    s.classList.remove('flicker'); void s.offsetWidth; s.classList.add('flicker');
+    setTimeout(() => s.classList.remove('flicker'), 550);
+  }
+  function ringAt(x, y) {
+    const s = $('preview-stage');
+    const r = document.createElement('div');
+    r.className = 'snap-ring';
+    r.style.left = x + 'px'; r.style.top = y + 'px';
+    s.appendChild(r);
+    setTimeout(() => r.remove(), 550);
+  }
+
+  // ---------- 场景渲染 ----------
+  function sceneHTML(mid) {
+    const m = MATERIALS.find((x) => x.id === mid);
+    const inner = {
+      cat:     `<div class="scene"><span class="hero anim-bounce">🐱</span><span class="deco" style="left:12%;top:18%" >🎵</span><span class="deco" style="right:14%;top:26%">🎵</span></div>`,
+      food:    `<div class="scene"><span class="hero anim-wiggle">🍜</span><span class="deco anim-steam" style="left:38%;top:22%">💨</span><span class="deco anim-steam" style="left:52%;top:18%;animation-delay:.5s">💨</span></div>`,
+      wedding: `<div class="scene"><span class="hero anim-float">💒</span><span class="deco anim-confetti" style="left:16%;top:8%">🎊</span><span class="deco anim-confetti" style="left:70%;top:10%;animation-delay:.4s">🎉</span><span class="deco anim-confetti" style="left:45%;top:6%;animation-delay:.8s">💞</span></div>`,
+      drive:   `<div class="scene"><span class="hero anim-drive">🚗</span><span class="deco" style="left:10%;bottom:10%">🏙️</span><span class="deco" style="right:12%;bottom:14%">🌆</span></div>`,
+      selfie:  `<div class="scene"><span class="hero anim-pulse">🤳</span><span class="deco anim-float" style="left:14%;top:20%">✨</span><span class="deco anim-float" style="right:16%;top:30%;animation-delay:.6s">✨</span></div>`,
+      dance:   `<div class="scene"><span class="hero anim-spin">🕺</span><span class="deco anim-wiggle" style="left:18%;bottom:14%">⚡</span><span class="deco anim-wiggle" style="right:20%;bottom:18%;animation-delay:.3s">🔥</span></div>`,
+      rain:    `<div class="scene"><span class="hero anim-sway" style="font-size:130px">☂️</span><span class="deco anim-float" style="left:16%;top:14%">🌧️</span><span class="deco anim-float" style="right:18%;top:20%;animation-delay:.5s">🌧️</span><span class="deco anim-float" style="left:45%;bottom:12%;animation-delay:.9s">🌧️</span></div>`,
+      cctv:    `<div class="scene"><span class="hero anim-flicker-slow">📹</span><span class="cctv-scan anim-scan"></span><span class="cctv-time">03:15:00</span><span class="overlay-text" style="left:12px;top:10px">CAM-04</span></div>`,
+      ghost:   `<div class="scene"><span class="hero anim-flicker-slow">👻</span><span class="deco anim-float" style="left:20%;top:16%">🌫️</span><span class="deco anim-float" style="right:22%;top:24%;animation-delay:.7s">🌫️</span></div>`,
+    };
+    return `<div class="scene-${m.id}" style="position:absolute;inset:0">${inner[m.id]}</div>`;
+  }
+
+  // ---------- 布局计算 ----------
+  function layout() {
+    let t = 0;
+    for (const c of state.clips) { c.start = t; t += c.out - c.in; }
+    return t;
+  }
+  const totalDur = () => state.clips.reduce((s, c) => s + (c.out - c.in), 0);
+  const clipAt = (t) => state.clips.find((c) => t >= c.start && t < c.start + (c.out - c.in));
+  const selected = () => state.clips.find((c) => c.id === state.selectedId) || null;
+  const mat = (c) => MATERIALS.find((m) => m.id === c.mid);
+
+  // 找时间轴上最近的节奏点（异常点不参与吸附，只做极近距离探测）
+  function nearestMarker(t) {
+    let best = null, bestD = SNAP_T;
+    for (const c of state.clips) {
+      const m = mat(c);
+      for (const g of m.good) {
+        const mt = c.start + (g - c.in);
+        const d = Math.abs(mt - t);
+        if (d < bestD) { bestD = d; best = { type: 'good', t: mt }; }
+      }
+      for (const b of m.bad) {
+        const mt = c.start + (b - c.in);
+        const d = Math.abs(mt - t);
+        if (d < bestD) { bestD = d; best = { type: 'bad', t: mt }; }
+      }
+      for (const a of m.anomaly) {
+        const mt = c.start + (a - c.in);
+        const d = Math.abs(mt - t);
+        if (d < 0.055) { best = { type: 'anomaly', t: mt }; }
+      }
+    }
+    return best;
+  }
+
+  function onMarkerFeedback(type) {
+    if (!state.stats) return;
+    if (type === 'good') {
+      state.stats.good++; popup('好点！', 'good'); sndGood();
+    } else if (type === 'bad') {
+      state.stats.bad++; popup('坏点！', 'bad'); sndBad(); shakeStage();
+    } else if (type === 'anomaly') {
+      state.anomalySeen++;
+      popup('？', 'anomaly'); sndAnomaly(); flickerStage();
+    }
+  }
+
+  // ---------- 渲染 ----------
+  function renderMediaList() {
+    const list = $('media-list');
+    list.innerHTML = '';
+    for (const m of MATERIALS) {
+      const card = document.createElement('div');
+      card.className = 'media-card';
+      card.draggable = true;
+      card.style.setProperty('--c1', m.c1);
+      card.style.setProperty('--c2', m.c2);
+      card.innerHTML = `<span class="thumb">${m.emoji}</span>
+        <div><div class="m-name">${m.name}</div><div class="m-meta">${m.dur}s · ${m.good.length}好点 · ${m.bad.length}坏点</div></div>`;
+      if (m.anomaly.length) card.innerHTML += `<span class="anomaly-badge">?</span>`;
+      card.addEventListener('click', () => { ensureAudio(); addClip(m); });
+      card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', m.id); e.dataTransfer.effectAllowed = 'copy'; });
+      list.appendChild(card);
+    }
+  }
+
+  function renderRuler(total) {
+    const ruler = $('ruler');
+    ruler.innerHTML = '';
+    ruler.style.width = Math.max(total, 8) * PPS + 'px';
+    for (let i = 0; i <= Math.ceil(total); i++) {
+      const tick = document.createElement('div');
+      tick.className = 'tick';
+      tick.style.left = i * PPS + 'px';
+      tick.innerHTML = `<span class="tick-label">${i}s</span>`;
+      ruler.appendChild(tick);
+    }
+  }
+
+  function renderTrack(total) {
+    const track = $('track');
+    track.innerHTML = '';
+    track.style.width = Math.max(total, 8) * PPS + 'px';
+    $('drop-hint').style.display = state.clips.length ? 'none' : 'block';
+
+    for (const c of state.clips) {
+      const m = mat(c);
+      const el = document.createElement('div');
+      el.className = 'clip' + (c.id === state.selectedId ? ' selected' : '');
+      el.dataset.id = c.id;
+      el.style.left = c.start * PPS + 'px';
+      el.style.width = Math.max((c.out - c.in) * PPS - 6, 42) + 'px';
+      el.style.setProperty('--c1', m.c1);
+      el.style.setProperty('--c2', m.c2);
+      el.innerHTML = `<span class="clip-emoji">${m.emoji}</span>
+        <span class="clip-name">${m.name}</span>
+        <span class="clip-dur">${(c.out - c.in).toFixed(1)}s</span>`;
+
+      // 节奏点小圆点
+      for (const g of m.good) { if (g >= c.in && g <= c.out) el.appendChild(dot(g, c, 'good')); }
+      for (const b of m.bad)  { if (b >= c.in && b <= c.out) el.appendChild(dot(b, c, 'bad')); }
+      for (const a of m.anomaly) { if (a >= c.in && a <= c.out) el.appendChild(dot(a, c, 'anomaly')); }
+
+      // 边缘手柄（选中时可见）
+      if (c.id === state.selectedId) {
+        const elL = document.createElement('div'); elL.className = 'edge left'; el.appendChild(elL);
+        const elR = document.createElement('div'); elR.className = 'edge right'; el.appendChild(elR);
+      }
+
+      track.appendChild(el);
+      bindClip(el, c);
+    }
+  }
+  function dot(t, c, type) {
+    const d = document.createElement('div');
+    d.className = 'marker-dot ' + type;
+    d.style.left = ((t - c.in) / (c.out - c.in)) * 100 + '%';
+    d.title = type === 'anomaly' ? '???' : type;
+    return d;
+  }
+
+  function renderPreview() {
+    const stage = $('preview-stage');
+    const sceneEl = $('scene');
+    state.stageW = stage.clientWidth;
+    state.stageH = stage.clientHeight;
+    const playing = state.playing;
+    const under = clipAt(state.playhead);
+    const c = playing ? under : (selected() || under);
+
+    if (!c) {
+      sceneEl.innerHTML = `<div class="scene-empty">🎬 把素材拖进时间线开始剪</div>`;
+      sceneEl.style.transform = '';
+      sceneEl.style.filter = '';
+      return;
+    }
+    const m = mat(c);
+    sceneEl.innerHTML = sceneHTML(m.id);
+    const dx = (c.comp.dx || 0), dy = (c.comp.dy || 0), sc = (c.comp.scale || 1.4);
+    sceneEl.style.transform = `translate(${dx}px, ${dy}px) scale(${sc})`;
+    sceneEl.style.filter = FILTERS[c.filter] ? FILTERS[c.filter].css : '';
+
+    // 构图辅助线（选中时显示）
+    const guides = $('guides');
+    guides.hidden = !selected();
+  }
+
+  function renderInspector() {
+    const c = selected();
+    $('insp-empty').hidden = !!c;
+    $('insp-body').hidden = !c;
+    if (!c) return;
+    const m = mat(c);
+    $('insp-name').textContent = `${m.emoji} ${m.name}（${(c.out - c.in).toFixed(1)}s）`;
+
+    // 滤镜按钮
+    const fb = $('filter-btns');
+    fb.innerHTML = '';
+    for (const key of Object.keys(FILTERS)) {
+      const b = document.createElement('button');
+      b.className = 'filter-btn' + (c.filter === key ? ' active' : '');
+      b.textContent = FILTERS[key].name;
+      b.addEventListener('click', () => { ensureAudio(); c.filter = key; renderAll(); });
+      fb.appendChild(b);
+    }
+
+    // 缩放滑条
+    $('scale-slider').value = Math.round((c.comp.scale || 1.4) * 100);
+    $('scale-label').textContent = $('scale-slider').value + '%';
+
+    // 节奏点说明
+    const chips = $('marker-chips');
+    chips.innerHTML = '';
+    m.good.forEach(() => chips.appendChild(chip('好点', 'good')));
+    m.bad.forEach(() => chips.appendChild(chip('坏点', 'bad')));
+    m.anomaly.forEach(() => chips.appendChild(chip('？？？', 'anomaly')));
+  }
+  function chip(text, cls) {
+    const s = document.createElement('span');
+    s.className = 'chip ' + cls;
+    s.textContent = text;
+    return s;
+  }
+
+  function renderBrief() {
+    const o = state.order;
+    $('brief-header').textContent = `${o.avatar} ${o.client}（${o.mood}）`;
+    $('brief-text').textContent = o.text;
+    const checks = $('brief-checks');
+    checks.innerHTML = '';
+    const dur = totalDur();
+    checks.appendChild(check(`⏱ 时长 ${dur.toFixed(1)}s / ${o.range[0]}–${o.range[1]}s`, dur >= o.range[0] && dur <= o.range[1]));
+    const hasColor = state.clips.some((c) => c.filter === o.color);
+    checks.appendChild(check(`🎨 客户喜欢的色调「${FILTERS[o.color].name}」`, o.color === 'none' ? true : hasColor));
+    const badKept = countBadKept();
+    if (o.chaos) checks.appendChild(check(`😈 坏镜头越鬼畜越好 ×${badKept}`, true));
+    else if (o.forbidBad) checks.appendChild(check(`😱 坏镜头剪干净（剩 ${badKept} 个）`, badKept === 0));
+    if (o.mystery) checks.appendChild(check(`👁 观察异常 ×${state.anomalySeen}`, state.anomalySeen > 0));
+  }
+  function check(text, ok) {
+    const d = document.createElement('div');
+    d.className = 'check ' + (ok ? 'ok' : 'bad');
+    d.textContent = (ok ? '✓ ' : '✗ ') + text;
+    return d;
+  }
+
+  function renderStatus() {
+    const o = state.order;
+    $('st-client').textContent = `${o.avatar} ${o.client} · ${o.mood}`;
+    $('st-duration').textContent = `⏱ 当前 ${totalDur().toFixed(1)}s`;
+    $('st-budget').textContent = `💰 预算 ¥${state.budget}`;
+    $('st-anomaly').textContent = `👁 观察记录 ${state.anomalySeen} 次`;
+    $('time-label').textContent = fmt(state.playhead) + ' / ' + fmt(totalDur());
+  }
+  function fmt(t) {
+    const s = Math.floor(t), m = Math.floor(s / 60);
+    return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function renderAll() {
+    const total = layout();
+    renderRuler(total);
+    renderTrack(total);
+    renderPreview();
+    renderInspector();
+    renderBrief();
+    renderStatus();
+    updatePlayhead();
+  }
+
+  function updatePlayhead() {
+    $('playhead').style.left = state.playhead * PPS + 'px';
+    $('time-label').textContent = fmt(state.playhead) + ' / ' + fmt(totalDur());
+  }
+
+  // ---------- 时间线操作 ----------
+  function addClip(m, atIndex) {
+    const clip = {
+      id: uid(), mid: m.id, in: 0, out: Math.min(m.dur, 4.5),
+      filter: 'none', comp: { dx: 0, dy: 0, scale: 1.4, snapped: false },
+    };
+    if (atIndex == null) state.clips.push(clip);
+    else state.clips.splice(atIndex, 0, clip);
+    state.selectedId = clip.id;
+    renderAll();
+  }
+
+  function removeClip(id) {
+    const i = state.clips.findIndex((c) => c.id === id);
+    if (i < 0) return;
+    state.clips.splice(i, 1);
+    if (state.selectedId === id) state.selectedId = state.clips[i] ? state.clips[i].id : (state.clips[i - 1] ? state.clips[i - 1].id : null);
+    renderAll();
+  }
+
+  function cutAt(t) {
+    const c = clipAt(t);
+    if (!c) return;
+    const tClip = t - c.start + c.in;
+    if (tClip < c.in + 0.18 || tClip > c.out - 0.18) return;
+
+    const m = mat(c);
+    let fb = null;
+    for (const g of m.good) if (Math.abs(g - tClip) <= 0.05) fb = 'good';
+    for (const b of m.bad) if (Math.abs(b - tClip) <= 0.05) fb = 'bad';
+    for (const a of m.anomaly) if (Math.abs(a - tClip) <= 0.05) fb = 'anomaly';
+
+    const A = { ...c, out: tClip };
+    const B = { ...c, id: uid(), in: tClip };
+    const i = state.clips.indexOf(c);
+    state.clips.splice(i, 1, A, B);
+    state.selectedId = B.id;
+
+    if (fb === 'good') { state.stats.perfect++; popup('Perfect Cut!', 'perfect'); sndPerfect(); }
+    else if (fb === 'bad') { state.stats.bad++; popup('剪坏啦！', 'bad'); sndBad(); shakeStage(); }
+    else if (fb === 'anomaly') { state.anomalySeen++; popup('？', 'anomaly'); sndAnomaly(); flickerStage(); }
+    else { popup('咔嚓', 'good'); sndGood(); }
+    renderAll();
+  }
+
+  function bindClip(el, c) {
+    el.addEventListener('pointerdown', (e) => {
+      ensureAudio();
+      const edge = e.target.closest('.edge');
+      if (edge) { startTrim(e, c, edge.classList.contains('left')); return; }
+      if (state.tool === 'blade') {
+        const rect = el.parentElement.getBoundingClientRect();
+        cutAt((e.clientX - rect.left) / PPS);
+        return;
+      }
+      state.selectedId = c.id;
+      renderAll();
+      startDrag(e, el, c);
+    });
+  }
+
+  // 拖拽排序
+  function startDrag(e, el, c) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startLeft = c.start * PPS;
+    el.classList.add('dragging');
+    const move = (ev) => {
+      const dx = ev.clientX - startX;
+      el.style.transform = `translateX(${dx}px) scale(1.03)`;
+    };
+    const up = (ev) => {
+      el.classList.remove('dragging');
+      el.style.transform = '';
+      const dx = ev.clientX - startX;
+      const projCenter = startLeft + dx + (c.out - c.in) * PPS / 2;
+      const others = state.clips.filter((x) => x.id !== c.id);
+      let idx = others.length;
+      for (let i = 0; i < others.length; i++) {
+        const oc = others[i];
+        const center = oc.start + (oc.out - oc.in) * PPS / 2;
+        if (projCenter < center) { idx = i; break; }
+      }
+      const arr = state.clips.filter((x) => x.id !== c.id);
+      arr.splice(idx, 0, c);
+      state.clips = arr;
+      renderAll();
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  // 边缘裁剪（带节奏点吸附）
+  function startTrim(e, c, isLeft) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const oIn = c.in, oOut = c.out;
+    const move = (ev) => {
+      const dx = (ev.clientX - startX) / PPS;
+      if (isLeft) {
+        let ni = clamp(oIn + dx, 0, oOut - MIN_DUR);
+        const snap = snapEdge(ni, c, 'left');
+        if (snap) ni = snap;
+        c.in = ni;
+      } else {
+        let no = clamp(oOut + dx, oIn + MIN_DUR, mat(c).dur);
+        const snap = snapEdge(no, c, 'right');
+        if (snap) no = snap;
+        c.out = no;
+      }
+      renderAll();
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+  function snapEdge(t, c, side) {
+    const m = mat(c);
+    for (const g of m.good) {
+      if (Math.abs(g - t) <= SNAP_T) { state.stats.good++; popup('好点！', 'good'); sndGood(); return g; }
+    }
+    for (const b of m.bad) {
+      if (Math.abs(b - t) <= SNAP_T) { state.stats.bad++; popup('坏点！', 'bad'); sndBad(); shakeStage(); return b; }
+    }
+    for (const a of m.anomaly) {
+      if (Math.abs(a - t) <= 0.055) { state.anomalySeen++; popup('？', 'anomaly'); sndAnomaly(); flickerStage(); return t; }
+    }
+    return null;
+  }
+
+  // ---------- 播放与走带 ----------
+  let raf = null, lastTs = 0;
+  function play() {
+    if (state.playing) return;
+    if (!state.clips.length) return;
+    if (state.playhead >= totalDur() - 0.01) state.playhead = 0;
+    state.playing = true;
+    $('btn-play').textContent = '⏸';
+    lastTs = performance.now();
+    const loop = (ts) => {
+      if (!state.playing) return;
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+      state.playhead = clamp(state.playhead + dt, 0, totalDur());
+      if (state.playhead >= totalDur() - 0.001) {
+        state.playhead = totalDur();
+        state.playing = false;
+        $('btn-play').textContent = '▶';
+      }
+      updatePlayhead();
+      renderPreview();
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+  }
+  function pause() {
+    state.playing = false;
+    $('btn-play').textContent = '▶';
+    if (raf) cancelAnimationFrame(raf);
+  }
+
+  // ---------- 构图 ----------
+  function startCompDrag(e) {
+    const c = selected();
+    if (!c || state.playing) return;
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const sdx = c.comp.dx || 0, sdy = c.comp.dy || 0;
+    const move = (ev) => {
+      const dx = clamp(sdx + (ev.clientX - startX), -state.stageW * 0.5, state.stageW * 0.5);
+      const dy = clamp(sdy + (ev.clientY - startY), -state.stageH * 0.5, state.stageH * 0.5);
+      c.comp.dx = dx; c.comp.dy = dy; c.comp.snapped = false;
+      $('scene').style.transform = `translate(${dx}px, ${dy}px) scale(${c.comp.scale || 1.4})`;
+    };
+    const up = (ev) => {
+      const anchors = [
+        { x: 0, y: 0, name: '居中' },
+        { x: -0.167 * state.stageW, y: 0, name: '左三分' },
+        { x: 0.167 * state.stageW, y: 0, name: '右三分' },
+      ];
+      let snapped = false;
+      for (const a of anchors) {
+        if (Math.abs(c.comp.dx - a.x) < state.stageW * 0.05 && Math.abs(c.comp.dy - a.y) < state.stageH * 0.07) {
+          c.comp.dx = a.x; c.comp.dy = a.y; c.comp.snapped = true;
+          snapped = true;
+          const cx = state.stageW / 2 + a.x, cy = state.stageH / 2 + a.y;
+          ringAt(cx, cy);
+          popup(a.name + '，好构图！', 'good');
+          sndGood();
+          break;
+        }
+      }
+      if (!snapped && (Math.abs(ev.clientX - startX) > 8 || Math.abs(ev.clientY - startY) > 8)) {
+        popup('构图歪了…', 'bad'); sndBad();
+      }
+      renderAll();
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  function setScale(v) {
+    const c = selected();
+    if (!c) return;
+    let sc = v / 100;
+    for (const t of [1, 1.5, 2]) {
+      if (Math.abs(sc - t) <= 0.045) { sc = t; popup('刚刚好！', 'good'); sndGood(); break; }
+    }
+    c.comp.scale = sc;
+    $('scale-label').textContent = Math.round(sc * 100) + '%';
+    renderPreview();
+  }
+
+  // ---------- 订单与交付 ----------
+  function countBadKept() {
+    let n = 0;
+    for (const c of state.clips) for (const b of mat(c).bad) if (b >= c.in && b <= c.out) n++;
+    return n;
+  }
+
+  function scoreOrder() {
+    const o = state.order, st = state.stats;
+    let s = 60;
+    s += st.good * 2 + st.perfect * 4;
+    if (o.chaos) s += st.bad * 3; else s -= st.bad * 2;
+    const badKept = countBadKept();
+    if (o.chaos) s += badKept * 2;
+    else if (o.forbidBad) s -= badKept * 5;
+    const compN = state.clips.filter((c) => c.comp.snapped).length;
+    s += Math.min(compN, 2) * 4;
+    const colorOk = o.color === 'none' || state.clips.some((c) => c.filter === o.color);
+    if (colorOk) s += 5;
+    const dur = totalDur();
+    if (dur >= o.range[0] && dur <= o.range[1]) s += 6; else s -= 10;
+    if (o.mystery && state.anomalySeen > 0) s += 10;
+    return clamp(Math.round(s), 0, 100);
+  }
+
+  function gradeOf(s) {
+    if (s >= 90) return ['S', '剪神下凡'];
+    if (s >= 78) return ['A', '相当能打'];
+    if (s >= 62) return ['B', '中规中矩'];
+    if (s >= 45) return ['C', '甲方皱眉'];
+    return ['D', '连夜跑路'];
+  }
+
+  function deliver() {
+    if (!state.clips.length) { popup('时间线还是空的！', 'bad'); return; }
+    ensureAudio();
+    pause();
+    const ov = $('deliver-overlay');
+    ov.hidden = false;
+    $('deliver-result').hidden = true;
+    $('deliver-progress').style.width = '0%';
+    let p = 0;
+    const iv = setInterval(() => {
+      p += Math.random() * 18 + 8;
+      $('deliver-progress').style.width = Math.min(p, 100) + '%';
+      if (p >= 100) {
+        clearInterval(iv);
+        setTimeout(showResult, 350);
+      }
+    }, 120);
+  }
+
+  function showResult() {
+    const o = state.order;
+    const score = scoreOrder();
+    const [g, gname] = gradeOf(score);
+    $('grade').textContent = g;
+    $('grade').style.color = score >= 78 ? '#2e9e4f' : score >= 62 ? '#d99a1b' : '#e05050';
+    $('score-line').textContent = `综合评分 ${score} · ${gname}`;
+    const badKept = countBadKept();
+    const detail = [];
+    detail.push(`好点吸附 ×${state.stats.good}  Perfect ×${state.stats.perfect}  坏点 ×${state.stats.bad}`);
+    detail.push(`构图 ${state.clips.filter((c) => c.comp.snapped).length}/${state.clips.length} 个素材  ·  时长 ${totalDur().toFixed(1)}s`);
+    if (o.mystery) detail.push(state.anomalySeen ? '👁 你看到了 3 点 15 分的人。' : '👁 你什么都没注意到。');
+    $('detail-line').textContent = detail.join('｜');
+    const replies = o.reply;
+    let reply;
+    if (score >= 78) reply = replies[0];
+    else if (score >= 62) reply = replies[3];
+    else if (score >= 45) reply = replies[2];
+    else reply = replies[1];
+    $('client-line').textContent = `${o.avatar} ${o.client}：${reply}`;
+    $('deliver-progress-wrap').style.display = 'none';
+    $('deliver-result').hidden = false;
+  }
+
+  function resetForOrder(o) {
+    state.order = o;
+    state.clips = [];
+    state.playhead = 0;
+    state.playing = false;
+    state.selectedId = null;
+    state.stats = { good: 0, bad: 0, perfect: 0 };
+    state.anomalySeen = 0;
+    state.budget = 300 + Math.floor(Math.random() * 500);
+    // 预置两段素材，方便直接上手
+    const seedMap = {
+      '婚礼哥': ['wedding', 'dance'],
+      '美食博主': ['food', 'selfie'],
+      '秃头老板': ['drive', 'cat'],
+      '鬼畜UP主': ['dance', 'drive'],
+      '大学生小琳': ['selfie', 'rain'],
+      '神秘客户': ['cctv', 'ghost'],
+    };
+    const seeds = seedMap[o.client] || ['cat', 'dance'];
+    for (const id of seeds) {
+      const m = MATERIALS.find((x) => x.id === id);
+      state.clips.push({
+        id: uid(), mid: m.id, in: 0, out: Math.min(m.dur, 4.5),
+        filter: 'none', comp: { dx: 0, dy: 0, scale: 1.4, snapped: false },
+      });
+    }
+    state.selectedId = state.clips[0].id;
+    const ov = $('deliver-overlay');
+    ov.hidden = true;
+    $('deliver-progress-wrap').style.display = '';
+    $('deliver-result').hidden = true;
+    renderAll();
+  }
+
+  function nextOrder() {
+    let o = ORDERS[Math.floor(Math.random() * ORDERS.length)];
+    if (state.order && ORDERS.length > 1) while (o.client === state.order.client) o = ORDERS[Math.floor(Math.random() * ORDERS.length)];
+    resetForOrder(o);
+  }
+
+  // ---------- 事件绑定 ----------
+  function bindEvents() {
+    $('btn-play').addEventListener('click', () => { ensureAudio(); state.playing ? pause() : play(); });
+    $('btn-cut').addEventListener('click', () => { ensureAudio(); cutAt(state.playhead); });
+    $('btn-delete').addEventListener('click', () => { const c = selected(); if (c) removeClip(c.id); });
+    $('btn-deliver').addEventListener('click', deliver);
+    $('btn-retry').addEventListener('click', () => { $('deliver-overlay').hidden = true; $('deliver-progress-wrap').style.display = ''; state.stats = { good: 0, bad: 0, perfect: 0 }; renderAll(); });
+    $('btn-next').addEventListener('click', nextOrder);
+    $('btn-center').addEventListener('click', () => { const c = selected(); if (!c) return; ensureAudio(); c.comp.dx = 0; c.comp.dy = 0; c.comp.snapped = true; popup('居中，好构图！', 'good'); sndGood(); renderAll(); });
+    $('scale-slider').addEventListener('input', (e) => setScale(+e.target.value));
+
+    document.querySelectorAll('.tool-btn[data-tool]').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.tool-btn[data-tool]').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        state.tool = b.dataset.tool;
+      });
+    });
+
+    // 走带：点击/拖动定位（带吸附）
+    const rulerWrap = $('ruler-wrap');
+    const seekFrom = (e) => {
+      const rect = rulerWrap.getBoundingClientRect();
+      let t = clamp((e.clientX - rect.left) / PPS, 0, totalDur());
+      const mk = nearestMarker(t);
+      if (mk && mk.type !== 'anomaly') { t = mk.t; onMarkerFeedback(mk.type); }
+      else if (mk && mk.type === 'anomaly') { t = mk.t; onMarkerFeedback('anomaly'); }
+      state.playhead = t;
+      state.playing = false;
+      $('btn-play').textContent = '▶';
+      updatePlayhead();
+      renderPreview();
+    };
+    rulerWrap.addEventListener('pointerdown', (e) => {
+      ensureAudio();
+      seekFrom(e);
+      const move = (ev) => seekFrom(ev);
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+
+    // 素材拖入时间线
+    const track = $('track');
+    track.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; $('drop-hint').style.display = 'none'; });
+    track.addEventListener('dragleave', () => { $('drop-hint').style.display = state.clips.length ? 'none' : 'block'; });
+    track.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const mid = e.dataTransfer.getData('text/plain');
+      const m = MATERIALS.find((x) => x.id === mid);
+      if (!m) return;
+      ensureAudio();
+      const rect = track.getBoundingClientRect();
+      const t = clamp((e.clientX - rect.left) / PPS, 0, Math.max(totalDur(), 0));
+      let idx = state.clips.length;
+      for (let i = 0; i < state.clips.length; i++) {
+        const oc = state.clips[i];
+        if (t < oc.start + (oc.out - oc.in) / 2) { idx = i; break; }
+      }
+      addClip(m, idx);
+    });
+
+    // 构图拖拽
+    $('preview-stage').addEventListener('pointerdown', startCompDrag);
+
+    // 键盘
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); ensureAudio(); state.playing ? pause() : play(); }
+      if (e.code === 'ArrowLeft') { state.playhead = clamp(state.playhead - 0.2, 0, totalDur()); updatePlayhead(); renderPreview(); }
+      if (e.code === 'ArrowRight') { state.playhead = clamp(state.playhead + 0.2, 0, totalDur()); updatePlayhead(); renderPreview(); }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selected()) removeClip(selected().id);
+      if (e.key === 'Escape') { if (!$('deliver-overlay').hidden) $('deliver-overlay').hidden = true; }
+    });
+
+    window.addEventListener('resize', renderPreview);
+  }
+
+  // ---------- 启动 ----------
+  function init() {
+    renderMediaList();
+    bindEvents();
+    nextOrder();
+  }
+  init();
+})();

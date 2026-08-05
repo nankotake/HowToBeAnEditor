@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>剪单人生 · Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">✂️ 剪单人生 <span class="demo-tag">Demo</span></div>
+      <div class="tools">
+        <button id="tool-select" class="tool-btn active" data-tool="select">🖱️ 选择</button>
+        <button id="tool-blade" class="tool-btn" data-tool="blade">🔪 刀片</button>
+        <button id="btn-cut" class="tool-btn">✂️ 分割</button>
+        <button id="btn-delete" class="tool-btn danger">🗑️ 删除</button>
+      </div>
+      <button id="btn-deliver" class="deliver-btn">📤 交付</button>
+    </header>
+
+    <main id="main">
+      <aside id="media-pool">
+        <h2>素材库</h2>
+        <p class="hint">点击加入时间线，或直接拖进去</p>
+        <div id="media-list"></div>
+      </aside>
+
+      <section id="center">
+        <div id="preview-wrap">
+          <div id="preview-stage">
+            <div id="scene"></div>
+            <div id="guides" hidden></div>
+          </div>
+          <div id="brief">
+            <div id="brief-header"></div>
+            <div id="brief-text"></div>
+            <div id="brief-checks"></div>
+          </div>
+        </div>
+        <div id="transport">
+          <button id="btn-play">▶</button>
+          <span id="time-label">00:00 / 00:00</span>
+          <span id="dur-hint"></span>
+        </div>
+      </section>
+
+      <aside id="inspector">
+        <h2>检查器</h2>
+        <div id="insp-empty" class="hint">选中时间线上的素材开始处理</div>
+        <div id="insp-body" hidden>
+          <div id="insp-name"></div>
+          <div class="insp-section">
+            <h3>🎨 调色</h3>
+            <div id="filter-btns"></div>
+          </div>
+          <div class="insp-section">
+            <h3>🖼️ 构图</h3>
+            <p class="mini-hint">拖动画面找好构图，靠近居中/三分线自动吸附</p>
+            <div id="comp-tools">
+              <button id="btn-center">⏺ 居中</button>
+              <input id="scale-slider" type="range" min="100" max="240" step="5" value="140">
+              <span id="scale-label">140%</span>
+            </div>
+          </div>
+          <div class="insp-section">
+            <h3>📍 节奏点</h3>
+            <div id="marker-chips" class="mini-hint"></div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <section id="timeline-panel">
+      <div id="ruler-wrap">
+        <div id="ruler"></div>
+        <div id="playhead"><div class="ph-knob"></div></div>
+      </div>
+      <div id="track-area">
+        <div id="track-label">V1</div>
+        <div id="track"></div>
+        <div id="drop-hint">把素材拖到这里 🎬</div>
+      </div>
+    </section>
+
+    <footer id="statusbar">
+      <span id="st-client"></span>
+      <span id="st-duration"></span>
+      <span id="st-budget"></span>
+      <span id="st-anomaly"></span>
+    </footer>
+  </div>
+
+  <div id="toast-layer"></div>
+
+  <div id="deliver-overlay" hidden>
+    <div id="deliver-box">
+      <div id="deliver-progress-wrap"><div id="deliver-progress"></div></div>
+      <div id="deliver-result" hidden>
+        <div id="grade"></div>
+        <div id="score-line"></div>
+        <div id="client-line"></div>
+        <div id="detail-line"></div>
+        <div class="result-btns">
+          <button id="btn-retry">🔁 重剪</button>
+          <button id="btn-next">📮 接下一单</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="media.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

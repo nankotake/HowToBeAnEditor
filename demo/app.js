@@ -677,17 +677,9 @@
     state.stats = { good: 0, bad: 0, perfect: 0 };
     state.anomalySeen = 0;
     state.previewMatId = null;
-    state.budget = 300 + Math.floor(Math.random() * 500);
+    state.budget = 688;
     // 预置两段素材，方便直接上手
-    const seedMap = {
-      '婚礼哥': ['wedding', 'dance'],
-      '美食博主': ['food', 'selfie'],
-      '秃头老板': ['drive', 'cat'],
-      '鬼畜UP主': ['dance', 'drive'],
-      '大学生小琳': ['selfie', 'rain'],
-      '神秘客户': ['cctv', 'ghost'],
-    };
-    const seeds = seedMap[o.client] || ['cat', 'dance'];
+    const seeds = ['wedding', 'dance'];
     let t = 0;
     for (const id of seeds) {
       const m = MATERIALS.find((x) => x.id === id);
@@ -705,12 +697,6 @@
     renderAll();
   }
 
-  function nextOrder() {
-    let o = ORDERS[Math.floor(Math.random() * ORDERS.length)];
-    if (state.order && ORDERS.length > 1) while (o.client === state.order.client) o = ORDERS[Math.floor(Math.random() * ORDERS.length)];
-    resetForOrder(o);
-  }
-
   // ---------- 事件绑定 ----------
   function bindEvents() {
     $('btn-play').addEventListener('click', () => { ensureAudio(); state.playing ? pause() : play(); });
@@ -722,7 +708,7 @@
     $('btn-delete').addEventListener('click', () => { const c = selected(); if (c) removeClip(c.id); });
     $('btn-deliver').addEventListener('click', deliver);
     $('btn-retry').addEventListener('click', () => { $('deliver-overlay').hidden = true; $('deliver-progress-wrap').style.display = ''; state.stats = { good: 0, bad: 0, perfect: 0 }; renderAll(); });
-    $('btn-next').addEventListener('click', nextOrder);
+    $('btn-next').addEventListener('click', () => resetForOrder(state.order));
     $('btn-center').addEventListener('click', () => { const c = selected(); if (!c) return; ensureAudio(); c.comp.dx = 0; c.comp.dy = 0; c.comp.snapped = true; popup('居中，好构图！', 'good'); sndGood(); renderAll(); });
     $('scale-slider').addEventListener('input', (e) => setScale(+e.target.value));
 
@@ -802,7 +788,7 @@
   function init() {
     renderMediaList();
     bindEvents();
-    nextOrder();
+    resetForOrder(ORDERS[0]);
   }
   init();
 })();

@@ -269,6 +269,7 @@ aside h2 {
   overflow: hidden;
   cursor: grab;
 }
+#preview-stage.paused .scene * { animation-play-state: paused !important; }
 #scene {
   position: absolute;
   width: 230%;

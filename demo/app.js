@@ -224,6 +224,7 @@
     const sceneEl = $('scene');
     state.stageW = stage.clientWidth;
     state.stageH = stage.clientHeight;
+    stage.classList.toggle('paused', !state.playing);
     const playing = state.playing;
     if (state.previewMatId && !playing) {
       sceneEl.innerHTML = sceneHTML(state.previewMatId);
@@ -525,6 +526,7 @@
     if (state.playhead >= totalDur() - 0.01) state.playhead = 0;
     state.playing = true;
     $('btn-play').textContent = '⏸';
+    renderPreview();
     lastTs = performance.now();
     const loop = (ts) => {
       if (!state.playing) return;
@@ -546,6 +548,7 @@
     state.playing = false;
     $('btn-play').textContent = '▶';
     if (raf) cancelAnimationFrame(raf);
+    renderPreview();
   }
 
   // ---------- 构图 ----------

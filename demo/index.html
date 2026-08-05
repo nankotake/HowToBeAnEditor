@@ -8,8 +8,22 @@
 </head>
 <body>
   <div id="app">
+    <div id="menubar">
+      <span class="brand">剪单人生<span class="demo-tag">DEMO</span></span>
+      <div id="menus">
+        <span class="menu-item">文件</span>
+        <span class="menu-item">编辑</span>
+        <span class="menu-item">修剪</span>
+        <span class="menu-item">时间线</span>
+        <span class="menu-item">片段</span>
+        <span class="menu-item">标记</span>
+        <span class="menu-item">显示</span>
+        <span class="menu-item">播放</span>
+        <span class="menu-item">工作区</span>
+        <span class="menu-item">帮助</span>
+      </div>
+    </div>
     <header id="topbar">
-      <div class="brand">剪单人生<span class="demo-tag">DEMO</span></div>
       <nav id="pages">
         <button class="page-tab">素材库</button>
         <button class="page-tab active">剪辑</button>
@@ -46,9 +60,13 @@
           </div>
         </div>
         <div id="transport">
+          <button id="btn-start" title="跳到开头">⏮</button>
+          <button id="btn-prev" title="上一帧">‹</button>
           <button id="btn-play">▶</button>
-          <span id="time-label">00:00 / 00:00</span>
-          <span id="dur-hint">空格 播放/暂停 · ← → 微调</span>
+          <button id="btn-next-f" title="下一帧">›</button>
+          <button id="btn-end" title="跳到结尾">⏭</button>
+          <span id="time-label">00:00:00:00 / 00:00:00:00</span>
+          <span id="dur-hint">空格 播放/暂停 · 点击标尺定位</span>
         </div>
       </section>
 

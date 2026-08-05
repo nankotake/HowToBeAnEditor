@@ -674,6 +674,10 @@
   // ---------- 事件绑定 ----------
   function bindEvents() {
     $('btn-play').addEventListener('click', () => { ensureAudio(); state.playing ? pause() : play(); });
+    $('btn-start').addEventListener('click', () => { ensureAudio(); pause(); state.playhead = 0; updatePlayhead(); renderPreview(); });
+    $('btn-end').addEventListener('click', () => { ensureAudio(); pause(); state.playhead = totalDur(); updatePlayhead(); renderPreview(); });
+    $('btn-prev').addEventListener('click', () => { ensureAudio(); pause(); state.playhead = clamp(state.playhead - 1 / 25, 0, totalDur()); updatePlayhead(); renderPreview(); });
+    $('btn-next-f').addEventListener('click', () => { ensureAudio(); pause(); state.playhead = clamp(state.playhead + 1 / 25, 0, totalDur()); updatePlayhead(); renderPreview(); });
     $('btn-cut').addEventListener('click', () => { ensureAudio(); cutAt(state.playhead); });
     $('btn-delete').addEventListener('click', () => { const c = selected(); if (c) removeClip(c.id); });
     $('btn-deliver').addEventListener('click', deliver);

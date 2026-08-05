@@ -22,6 +22,7 @@
     budget: 0,
     stageW: 0,
     stageH: 0,
+    previewMatId: null,
   };
 
   // ---------- 音频反馈 ----------
@@ -78,15 +79,15 @@
   function sceneHTML(mid) {
     const m = MATERIALS.find((x) => x.id === mid);
     const inner = {
-      cat:     `<div class="scene"><span class="hero anim-bounce">🐱</span><span class="deco" style="left:12%;top:18%" >🎵</span><span class="deco" style="right:14%;top:26%">🎵</span></div>`,
-      food:    `<div class="scene"><span class="hero anim-wiggle">🍜</span><span class="deco anim-steam" style="left:38%;top:22%">💨</span><span class="deco anim-steam" style="left:52%;top:18%;animation-delay:.5s">💨</span></div>`,
-      wedding: `<div class="scene"><span class="hero anim-float">💒</span><span class="deco anim-confetti" style="left:16%;top:8%">🎊</span><span class="deco anim-confetti" style="left:70%;top:10%;animation-delay:.4s">🎉</span><span class="deco anim-confetti" style="left:45%;top:6%;animation-delay:.8s">💞</span></div>`,
-      drive:   `<div class="scene"><span class="hero anim-drive">🚗</span><span class="deco" style="left:10%;bottom:10%">🏙️</span><span class="deco" style="right:12%;bottom:14%">🌆</span></div>`,
-      selfie:  `<div class="scene"><span class="hero anim-pulse">🤳</span><span class="deco anim-float" style="left:14%;top:20%">✨</span><span class="deco anim-float" style="right:16%;top:30%;animation-delay:.6s">✨</span></div>`,
-      dance:   `<div class="scene"><span class="hero anim-spin">🕺</span><span class="deco anim-wiggle" style="left:18%;bottom:14%">⚡</span><span class="deco anim-wiggle" style="right:20%;bottom:18%;animation-delay:.3s">🔥</span></div>`,
-      rain:    `<div class="scene"><span class="hero anim-sway" style="font-size:130px">☂️</span><span class="deco anim-float" style="left:16%;top:14%">🌧️</span><span class="deco anim-float" style="right:18%;top:20%;animation-delay:.5s">🌧️</span><span class="deco anim-float" style="left:45%;bottom:12%;animation-delay:.9s">🌧️</span></div>`,
-      cctv:    `<div class="scene"><span class="hero anim-flicker-slow">📹</span><span class="cctv-scan anim-scan"></span><span class="cctv-time">03:15:00</span><span class="overlay-text" style="left:12px;top:10px">CAM-04</span></div>`,
-      ghost:   `<div class="scene"><span class="hero anim-flicker-slow">👻</span><span class="deco anim-float" style="left:20%;top:16%">🌫️</span><span class="deco anim-float" style="right:22%;top:24%;animation-delay:.7s">🌫️</span></div>`,
+      cat:     `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;bottom:37%">🧶</span><span class="bg-deco" style="right:63%;top:36%">🪟</span><span class="hero anim-bounce">🐱</span><span class="deco" style="left:42%;top:12%">🎵</span><span class="deco" style="right:42%;top:20%">🎵</span></div>`,
+      food:    `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;bottom:37%">🥢</span><span class="bg-deco" style="right:63%;top:36%">🥬</span><span class="hero anim-wiggle">🍜</span><span class="deco anim-steam" style="left:44%;top:20%">💨</span><span class="deco anim-steam" style="left:53%;top:16%;animation-delay:.5s">💨</span></div>`,
+      wedding: `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;top:36%">🌸</span><span class="bg-deco" style="right:63%;bottom:37%">🎀</span><span class="hero anim-float">💒</span><span class="deco anim-confetti" style="left:42%;top:8%">🎊</span><span class="deco anim-confetti" style="right:42%;top:10%;animation-delay:.4s">🎉</span><span class="deco anim-confetti" style="left:48%;top:6%;animation-delay:.8s">💞</span></div>`,
+      drive:   `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;bottom:37%">🛣️</span><span class="bg-deco" style="right:63%;top:36%">🚦</span><span class="hero anim-drive">🚗</span><span class="deco" style="left:42%;bottom:10%">🏙️</span><span class="deco" style="right:42%;bottom:14%">🌆</span></div>`,
+      selfie:  `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;top:36%">🌟</span><span class="bg-deco" style="right:63%;bottom:37%">📱</span><span class="hero anim-pulse">🤳</span><span class="deco anim-float" style="left:42%;top:14%">✨</span><span class="deco anim-float" style="right:42%;top:22%;animation-delay:.6s">✨</span></div>`,
+      dance:   `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;top:36%">🎶</span><span class="bg-deco" style="right:63%;bottom:37%">💥</span><span class="hero anim-spin">🕺</span><span class="deco anim-wiggle" style="left:42%;bottom:14%">⚡</span><span class="deco anim-wiggle" style="right:42%;bottom:18%;animation-delay:.3s">🔥</span></div>`,
+      rain:    `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;bottom:37%">🏠</span><span class="bg-deco" style="right:63%;top:36%">☔</span><span class="hero anim-sway" style="font-size:130px">☂️</span><span class="deco anim-float" style="left:42%;top:14%">🌧️</span><span class="deco anim-float" style="right:42%;top:20%;animation-delay:.5s">🌧️</span><span class="deco anim-float" style="left:48%;bottom:12%;animation-delay:.9s">🌧️</span></div>`,
+      cctv:    `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;bottom:37%">🚪</span><span class="bg-deco" style="right:63%;top:36%">⚠️</span><span class="hero anim-flicker-slow">📹</span><span class="cctv-scan anim-scan"></span><span class="cctv-time">03:15:00</span><span class="overlay-text" style="left:12px;top:10px">CAM-04</span></div>`,
+      ghost:   `<div class="scene"><div class="bg-pattern"></div><span class="bg-deco" style="left:37%;bottom:37%">🕯️</span><span class="bg-deco" style="right:63%;top:36%">🕸️</span><span class="hero anim-flicker-slow">👻</span><span class="deco anim-float" style="left:42%;top:16%">🌫️</span><span class="deco anim-float" style="right:42%;top:24%;animation-delay:.7s">🌫️</span></div>`,
     };
     return `<div class="scene-${m.id}" style="position:absolute;inset:0">${inner[m.id]}</div>`;
   }
@@ -148,7 +149,16 @@
         <div><div class="m-name">${m.name}</div><div class="m-meta">${fmtShort(m.dur)} · 好${m.good.length} · 坏${m.bad.length}</div></div>`;
       if (m.anomaly.length) card.innerHTML += `<span class="anomaly-badge">?</span>`;
       card.addEventListener('click', () => { ensureAudio(); addClip(m); });
-      card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', m.id); e.dataTransfer.effectAllowed = 'copy'; });
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', m.id);
+        e.dataTransfer.effectAllowed = 'copy';
+        state.previewMatId = m.id;
+        renderPreview();
+      });
+      card.addEventListener('dragend', () => {
+        state.previewMatId = null;
+        renderPreview();
+      });
       list.appendChild(card);
     }
   }
@@ -214,6 +224,13 @@
     state.stageW = stage.clientWidth;
     state.stageH = stage.clientHeight;
     const playing = state.playing;
+    if (state.previewMatId && !playing) {
+      sceneEl.innerHTML = sceneHTML(state.previewMatId);
+      sceneEl.style.transform = '';
+      sceneEl.style.filter = '';
+      $('guides').hidden = true;
+      return;
+    }
     const under = clipAt(state.playhead);
     const c = playing ? under : (selected() || under);
 
@@ -659,6 +676,7 @@
     state.selectedId = null;
     state.stats = { good: 0, bad: 0, perfect: 0 };
     state.anomalySeen = 0;
+    state.previewMatId = null;
     state.budget = 300 + Math.floor(Math.random() * 500);
     // 预置两段素材，方便直接上手
     const seedMap = {

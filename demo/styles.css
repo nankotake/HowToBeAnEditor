@@ -674,6 +674,21 @@ aside h2 {
 .scene-ghost { background: linear-gradient(160deg, #c9c9e8, #8f8fd0); }
 
 .scene { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.scene .bg-pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 38% 35%, rgba(255, 255, 255, 0.55) 0 90px, transparent 91px),
+    radial-gradient(circle at 62% 68%, rgba(0, 0, 0, 0.18) 0 110px, transparent 111px),
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.35) 0 60px, transparent 61px),
+    linear-gradient(to bottom,
+      rgba(255, 255, 255, 0) 0 54%,
+      rgba(0, 0, 0, 0.18) 54% 55%,
+      rgba(255, 255, 255, 0) 55% 100%);
+  background-size: 100% 100%;
+}
+.scene .bg-deco { position: absolute; font-size: 46px; opacity: 0.85; filter: saturate(0.9); }
 .scene .hero { font-size: 110px; filter: drop-shadow(6px 6px 0 rgba(0, 0, 0, 0.2)); }
 .scene .deco { position: absolute; font-size: 40px; opacity: 0.9; }
 .scene .overlay-text {

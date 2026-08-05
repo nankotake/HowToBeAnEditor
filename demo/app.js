@@ -96,7 +96,10 @@
   // ---------- 布局计算 ----------
   // 自由摆放：start 存在每个 clip 上，允许空隙
   const totalDur = () => state.clips.reduce((s, c) => Math.max(s, c.start + (c.out - c.in)), 0);
-  const clipAt = (t) => state.clips.find((c) => t >= c.start && t < c.start + (c.out - c.in));
+  // 优先取指针所在片段；恰好在片段结尾时取上一段的最后一帧（避免边界跳变/结尾变空）
+  const clipAt = (t) =>
+    state.clips.find((c) => Math.abs(t - (c.start + (c.out - c.in))) < 0.0001) ||
+    state.clips.find((c) => t >= c.start && t < c.start + (c.out - c.in));
   const selected = () => state.clips.find((c) => c.id === state.selectedId) || null;
   const mat = (c) => MATERIALS.find((m) => m.id === c.mid);
 

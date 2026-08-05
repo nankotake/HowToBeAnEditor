@@ -192,7 +192,7 @@
       el.className = 'clip' + (c.id === state.selectedId ? ' selected' : '');
       el.dataset.id = c.id;
       el.style.left = c.start * PPS + 'px';
-      el.style.width = Math.max((c.out - c.in) * PPS - 6, 42) + 'px';
+      el.style.width = Math.max((c.out - c.in) * PPS - 10, 42) + 'px';
       el.style.setProperty('--c1', m.c1);
       el.style.setProperty('--c2', m.c2);
       el.innerHTML = `<span class="clip-emoji">${m.emoji}</span>
@@ -463,6 +463,10 @@
         popup('片段重叠了！', 'bad'); sndBad(); shakeStage();
       } else {
         c.start = Math.round(c.start * 4) / 4; // 吸附到 0.25s 网格
+        if (overlaps(c.start)) {
+          c.start = origStart;
+          popup('片段重叠了！', 'bad'); sndBad(); shakeStage();
+        }
       }
       renderAll();
       window.removeEventListener('pointermove', move);

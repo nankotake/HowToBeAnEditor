@@ -441,7 +441,7 @@ aside h2 {
 }
 #tl-zoom { font-size: 10px; color: #6f6f6f; }
 
-#ruler-wrap { position: relative; height: 24px; background: #191919; border-bottom: 1px solid var(--border-soft); }
+#ruler-wrap { position: relative; height: 24px; background: #191919; border-bottom: 1px solid var(--border-soft); margin-left: 49px; }
 #ruler, #track { position: relative; height: 100%; }
 #ruler { height: 24px; }
 .tick {

@@ -20,7 +20,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 
-html, body { height: 100%; overflow: hidden; }
+html { height: 100%; overflow: hidden; }
+body { height: 100%; overflow: auto; }
 
 body {
   font-family: var(--sans);
@@ -137,7 +138,7 @@ button:active { background: #303030; }
 .deliver-btn:hover { background: #ff9b47; border-color: #ff9b47; }
 
 /* ===== 主体三栏 ===== */
-#app { display: flex; flex-direction: column; height: 100vh; }
+#app { display: flex; flex-direction: column; height: 100vh; min-width: 1000px; min-height: 680px; }
 #main {
   display: grid;
   grid-template-columns: 200px 1fr 250px;
@@ -211,11 +212,11 @@ aside h2 {
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 /* 中央预览 */
-#center { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#preview-wrap { position: relative; overflow: hidden; background: #000; }
+#center { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+#preview-wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; }
 #preview-stage {
-  position: relative;
-  aspect-ratio: 16 / 9;
+  position: absolute;
+  inset: 0;
   background: #000;
   overflow: hidden;
   cursor: grab;
@@ -275,6 +276,7 @@ aside h2 {
   left: 10px;
   top: 10px;
   width: 248px;
+  max-width: calc(100% - 20px);
   background: rgba(26, 26, 26, 0.93);
   border: 1px solid #414141;
   border-radius: 2px;
@@ -300,6 +302,7 @@ aside h2 {
   padding: 4px 8px;
   background: #141414;
   border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
 }
 #btn-play { width: 36px; padding: 4px 0; font-size: 12px; }
 #transport button { width: 30px; padding: 3px 0; font-size: 12px; }

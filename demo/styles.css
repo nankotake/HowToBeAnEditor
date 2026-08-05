@@ -474,6 +474,11 @@ aside h2 {
   box-shadow: 0 0 0 1px var(--accent), 0 2px 8px rgba(242, 132, 44, 0.28);
 }
 .clip.dragging { z-index: 20; opacity: 0.92; cursor: grabbing; }
+.clip.overlap {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 1px var(--bad);
+  background: #3a2020;
+}
 .clip .clip-emoji { font-size: 16px; }
 .clip .clip-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clip .clip-dur { font-family: var(--mono); font-size: 10px; color: #8f8f8f; }

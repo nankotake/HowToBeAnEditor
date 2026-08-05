@@ -92,12 +92,8 @@
   }
 
   // ---------- 布局计算 ----------
-  function layout() {
-    let t = 0;
-    for (const c of state.clips) { c.start = t; t += c.out - c.in; }
-    return t;
-  }
-  const totalDur = () => state.clips.reduce((s, c) => s + (c.out - c.in), 0);
+  // 自由摆放：start 存在每个 clip 上，允许空隙
+  const totalDur = () => state.clips.reduce((s, c) => Math.max(s, c.start + (c.out - c.in)), 0);
   const clipAt = (t) => state.clips.find((c) => t >= c.start && t < c.start + (c.out - c.in));
   const selected = () => state.clips.find((c) => c.id === state.selectedId) || null;
   const mat = (c) => MATERIALS.find((m) => m.id === c.mid);
@@ -319,7 +315,7 @@
   }
 
   function renderAll() {
-    const total = layout();
+    const total = totalDur();
     renderRuler(total);
     renderTrack(total);
     renderPreview();
@@ -335,13 +331,18 @@
   }
 
   // ---------- 时间线操作 ----------
-  function addClip(m, atIndex) {
+  function addClip(m, start, atIndex) {
     const clip = {
-      id: uid(), mid: m.id, in: 0, out: Math.min(m.dur, 4.5),
+      id: uid(), mid: m.id, in: 0, out: Math.min(m.dur, 4.5), start: 0,
       filter: 'none', comp: { dx: 0, dy: 0, scale: 1.4, snapped: false },
     };
-    if (atIndex == null) state.clips.push(clip);
-    else state.clips.splice(atIndex, 0, clip);
+    if (atIndex == null) {
+      clip.start = (start == null) ? totalDur() : start;
+      state.clips.push(clip);
+    } else {
+      clip.start = start;
+      state.clips.splice(atIndex, 0, clip);
+    }
     state.selectedId = clip.id;
     renderAll();
   }
@@ -367,7 +368,7 @@
     for (const a of m.anomaly) if (Math.abs(a - tClip) <= 0.05) fb = 'anomaly';
 
     const A = { ...c, out: tClip };
-    const B = { ...c, id: uid(), in: tClip };
+    const B = { ...c, id: uid(), in: tClip, start: c.start + (tClip - c.in) };
     const i = state.clips.indexOf(c);
     state.clips.splice(i, 1, A, B);
     state.selectedId = B.id;
@@ -390,42 +391,60 @@
         return;
       }
       state.selectedId = c.id;
-      renderAll();
+      document.querySelectorAll('.clip').forEach((x) => x.classList.toggle('selected', x.dataset.id === c.id));
+      renderInspector();
+      renderPreview();
       startDrag(e, el, c);
     });
   }
 
-  // 拖拽排序
+  // 自由拖动摆放（允许空隙，重叠时弹回）
   function startDrag(e, el, c) {
     e.preventDefault();
     const startX = e.clientX;
-    const startLeft = c.start * PPS;
+    const origStart = c.start;
+    const dur = c.out - c.in;
     el.classList.add('dragging');
-    const move = (ev) => {
-      const dx = ev.clientX - startX;
-      el.style.transform = `translateX(${dx}px) scale(1.03)`;
-    };
-    const up = (ev) => {
-      el.classList.remove('dragging');
-      el.style.transform = '';
-      const dx = ev.clientX - startX;
-      const projCenter = startLeft + dx + (c.out - c.in) * PPS / 2;
-      const others = state.clips.filter((x) => x.id !== c.id);
-      let idx = others.length;
-      for (let i = 0; i < others.length; i++) {
-        const oc = others[i];
-        const center = oc.start + (oc.out - oc.in) * PPS / 2;
-        if (projCenter < center) { idx = i; break; }
+
+    const overlaps = (s) => {
+      for (const o of state.clips) {
+        if (o.id === c.id) continue;
+        const od = o.out - o.in;
+        if (s < o.start + od && o.start < s + dur) return true;
       }
-      const arr = state.clips.filter((x) => x.id !== c.id);
-      arr.splice(idx, 0, c);
-      state.clips = arr;
+      return false;
+    };
+
+    const move = (ev) => {
+      const dx = (ev.clientX - startX) / PPS;
+      const ns = clamp(origStart + dx, 0, 60);
+      c.start = ns;
+      el.style.left = ns * PPS + 'px';
+      const ov = overlaps(ns);
+      el.classList.toggle('overlap', ov);
+      autoScroll(ev.clientX);
+    };
+    const up = () => {
+      el.classList.remove('dragging');
+      el.classList.remove('overlap');
+      if (overlaps(c.start)) {
+        c.start = origStart;
+        popup('片段重叠了！', 'bad'); sndBad(); shakeStage();
+      } else {
+        c.start = Math.round(c.start * 4) / 4; // 吸附到 0.25s 网格
+      }
       renderAll();
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+  }
+  function autoScroll(clientX) {
+    const panel = $('timeline-panel');
+    const r = panel.getBoundingClientRect();
+    if (clientX > r.right - 50) panel.scrollLeft += 16;
+    else if (clientX < r.left + 50) panel.scrollLeft -= 16;
   }
 
   // 边缘裁剪（带节奏点吸附）
@@ -440,6 +459,7 @@
         let ni = clamp(oIn + dx, 0, oOut - MIN_DUR);
         const snap = snapEdge(ni, c, 'left');
         if (snap) ni = snap;
+        c.start = Math.max(0, c.start + (ni - oIn)); // 左缘裁剪时右缘锚定
         c.in = ni;
       } else {
         let no = clamp(oOut + dx, oIn + MIN_DUR, mat(c).dur);
@@ -650,12 +670,14 @@
       '神秘客户': ['cctv', 'ghost'],
     };
     const seeds = seedMap[o.client] || ['cat', 'dance'];
+    let t = 0;
     for (const id of seeds) {
       const m = MATERIALS.find((x) => x.id === id);
       state.clips.push({
-        id: uid(), mid: m.id, in: 0, out: Math.min(m.dur, 4.5),
+        id: uid(), mid: m.id, in: 0, out: Math.min(m.dur, 4.5), start: t,
         filter: 'none', comp: { dx: 0, dy: 0, scale: 1.4, snapped: false },
       });
+      t += Math.min(m.dur, 4.5);
     }
     state.selectedId = state.clips[0].id;
     const ov = $('deliver-overlay');
@@ -728,13 +750,19 @@
       if (!m) return;
       ensureAudio();
       const rect = track.getBoundingClientRect();
-      const t = clamp((e.clientX - rect.left) / PPS, 0, Math.max(totalDur(), 0));
-      let idx = state.clips.length;
-      for (let i = 0; i < state.clips.length; i++) {
-        const oc = state.clips[i];
-        if (t < oc.start + (oc.out - oc.in) / 2) { idx = i; break; }
+      const t = clamp((e.clientX - rect.left) / PPS, 0, 60);
+      const dur = Math.min(m.dur, 4.5);
+      const overlap = state.clips.some((oc) => t < oc.start + (oc.out - oc.in) && oc.start < t + dur);
+      let start = t, idx = state.clips.length;
+      if (!overlap) {
+        for (let i = 0; i < state.clips.length; i++) {
+          const oc = state.clips[i];
+          if (t < oc.start + (oc.out - oc.in) / 2) { idx = i; break; }
+        }
+      } else {
+        start = totalDur();
       }
-      addClip(m, idx);
+      addClip(m, start, idx);
     });
 
     // 构图拖拽
